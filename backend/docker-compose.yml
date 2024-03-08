@@ -14,5 +14,15 @@
       volumes:
         - ./init.sh:/docker-entrypoint-initdb.d/init.sh
         - ./db_data:/var/lib/mysql:rw
+    backend:
+      depends_on:
+        - db
+      env_file: .env
+      ports:
+        - 8080:8080
+      build:
+        context: ./
+        dockerfile: Dockerfile
+
   volumes:
     db_data:
