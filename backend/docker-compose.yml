@@ -1,0 +1,18 @@
+  version: '3.8'
+  services:
+    db:
+      image: mysql:8.3
+      environment:
+        - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+        - MYSQL_USER=yurie
+        - MYSQL_ROOT_HOST=localhost
+        - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+        - MYSQL_DATABASE=kaleido
+      ports:
+        - 3306:3306
+      restart: always
+      volumes:
+        - ./init.sh:/docker-entrypoint-initdb.d/init.sh
+        - ./db_data:/var/lib/mysql:rw
+  volumes:
+    db_data:

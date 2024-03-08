@@ -9,7 +9,7 @@ import (
 // Config stores configuration extracted from environmental variables by using:
 // https://github.com/kelseyhightower/envconfig
 type Config struct {
-	PostgresDSN string `envconfig:"POSTGRES_DSN" required:"true"`
+	PostgresDSN string `envconfig:"MYSQL_DSN" required:"true"`
 }
 
 func NewConfig() (*Config, error) {

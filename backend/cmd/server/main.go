@@ -76,6 +76,6 @@ func Run(cfg *config.Config) int {
 	defer cancel()
 
 	srv.Shutdown(ctx)
-	log.Println("Gracefully shutting down")
+	log.Println("Gracefully shutting down...")
 	return exitOK
 }
