@@ -1,23 +1,55 @@
 package main
 
 import (
+	"backend/cmd/server/config"
 	"context"
-	"fmt"
+	"database/sql"
+	"errors"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 )
 
 func TestHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("Hello World!")
+	log.Printf("Hello World!")
 }
 
+const (
+	exitOK = iota
+	exitError
+	shutdownWait = time.Second * 30
+)
+
 func main() {
-	var wait time.Duration
+	cfg, err := config.NewConfig()
+	if err != nil {
+		log.Fatalf("Failed to setup config: %s", err.Error())
+	}
+
+	os.Exit(Run(cfg))
+}
+
+func Run(cfg *config.Config) int {
+	log.Println("Setting up DB...")
+	db, err := sql.Open("mysql", cfg.PostgresDSN)
+	if err != nil {
+		log.Fatalf("Failed to prepare DB: %s", err.Error())
+		return exitError
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("Failed to health-check DB: %s", err.Error())
+		return exitError
+	}
+
+	log.Println("Setting up HTTP server...")
 	r := mux.NewRouter()
 	r.HandleFunc("/", TestHandler)
 	http.Handle("/", r)
@@ -31,8 +63,8 @@ func main() {
 	}
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			log.Println(err)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("Failed to serve HTTP server: %s", err.Error())
 		}
 	}()
 
@@ -40,10 +72,10 @@ func main() {
 	signal.Notify(c, os.Interrupt)
 	<-c
 
-	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownWait)
 	defer cancel()
 
 	srv.Shutdown(ctx)
-	log.Println("shutting down")
-	os.Exit(0)
+	log.Println("Gracefully shutting down")
+	return exitOK
 }
