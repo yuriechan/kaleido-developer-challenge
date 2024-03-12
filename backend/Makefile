@@ -8,4 +8,4 @@ docker-compose-down:
 
 .PHONY: solc 
 solc:
-	solc --bin --abi --optimize --overwrite -o contracts/ contracts/marketplace.sol
+	solc --evm-version paris --bin --abi --optimize --overwrite -o contracts/ contracts/marketplace.sol
