@@ -2,11 +2,16 @@ package main
 
 import (
 	"backend/cmd/server/config"
+	"backend/internal/infra/blockchain"
+	"backend/internal/infra/mysql"
+	"backend/internal/service/item"
+	http2 "backend/internal/transport/http"
 	"context"
 	"database/sql"
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"time"
@@ -16,6 +21,10 @@ import (
 )
 
 func TestHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Hello World!")
+}
+
+func ItemListHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Hello World!")
 }
 
@@ -49,9 +58,22 @@ func Run(cfg *config.Config) int {
 		return exitError
 	}
 
+	dbClient := mysql.New(db)
+	httpClient := http.DefaultClient
+	httpUrl, err := url.Parse(cfg.FireflyBaseUrl)
+	if err != nil {
+		log.Fatalf("Failed to parse url (%s): %s", cfg.FireflyBaseUrl, err.Error())
+		return exitError
+	}
+	blockchainClient := blockchain.New(httpUrl, httpClient)
+	itemService := item.New(blockchainClient, dbClient)
+	httpServer := http2.New(itemService)
+
 	log.Println("Setting up HTTP server...")
 	r := mux.NewRouter()
-	r.HandleFunc("/", TestHandler)
+	r.HandleFunc("/items/list", httpServer.ListItem).Methods("POST")
+	r.HandleFunc("/items/buy", httpServer.PurchaseItem).Methods("POST")
+	r.HandleFunc("/items/get", httpServer.GetItem).Methods("GET")
 	http.Handle("/", r)
 
 	srv := &http.Server{
