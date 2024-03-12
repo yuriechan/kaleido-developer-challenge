@@ -2,6 +2,7 @@ package main
 
 import (
 	"backend/cmd/server/config"
+	_ "backend/contracts"
 	"backend/internal/infra/blockchain"
 	"backend/internal/infra/mysql"
 	"backend/internal/service/item"
@@ -19,14 +20,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 )
-
-func TestHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Hello World!")
-}
-
-func ItemListHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Hello World!")
-}
 
 const (
 	exitOK = iota
