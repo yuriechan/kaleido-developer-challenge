@@ -68,8 +68,8 @@ func (c *Client) CreateOrUpdateItem(ctx context.Context, item *domain.Item) erro
 		return fmt.Errorf("CreateOrUpdateItem called with nil item data")
 	}
 
-	var isCreated bool
 	selectQuery := "SELECT id FROM items WHERE id = ?"
+	var isCreated bool
 	var id string
 	if err := c.db.QueryRow(selectQuery, item.ID).Scan(&id); errors.Is(err, sql.ErrNoRows) {
 		insertQuery := "INSERT INTO items (id, name, state) VALUES (?, ?, ?)"
