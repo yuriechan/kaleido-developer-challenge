@@ -9,7 +9,11 @@ const (
 )
 
 type Item struct {
-	ID    string    `json:"id"`
-	Name  string    `json:"name"`
-	State ItemState `json:"state"`
+	ID                   string    `json:"id"`
+	Name                 string    `json:"name"`
+	State                ItemState `json:"state"`
+	Price                int64     `json:"price"`
+	NFTID                string    `json:"nft_id"`
+	NFTAddressID         string    `json:"nft_address_id"`
+	SmartContractAddress string    `json:"smart_contract_address"`
 }

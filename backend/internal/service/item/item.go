@@ -10,6 +10,8 @@ type blockchainClient interface {
 	CreatePool(ctx context.Context) error
 	MintToken(ctx context.Context) error
 	TransferToken(ctx context.Context) error
+	DeploySmartContract(ctx context.Context, item *domain.Item) error
+	EnableNFTForSale(ctx context.Context, contractAddress string) error
 }
 
 type dbClient interface {
@@ -45,8 +47,11 @@ func (s *Service) ListItem(ctx context.Context, item *domain.Item) error {
 	if err := s.dbClient.CreateOrUpdateItem(ctx, item); err != nil {
 		return fmt.Errorf("s.dbClient.CreateOrUpdateItem: %w", err)
 	}
-	if err := s.blockchainClient.MintToken(ctx); err != nil {
-		return fmt.Errorf("s.blockchainClient.MintToken: %w", err)
+	if err := s.blockchainClient.DeploySmartContract(ctx, item); err != nil {
+		return fmt.Errorf("s.blockchainClient.DeploySmartContract: %w", err)
+	}
+	if err := s.blockchainClient.EnableNFTForSale(ctx, item.SmartContractAddress); err != nil {
+		return fmt.Errorf("s.blockchainClient.EnableNFTForSale: %w", err)
 	}
 	return nil
 }
