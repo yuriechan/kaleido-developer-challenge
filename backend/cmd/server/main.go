@@ -3,7 +3,7 @@ package main
 import (
 	"backend/cmd/server/config"
 	_ "backend/contracts"
-	"backend/internal/infra/blockchain"
+	"backend/internal/infra/firefly"
 	"backend/internal/infra/mysql"
 	"backend/internal/service/item"
 	http2 "backend/internal/transport/http"
@@ -17,7 +17,7 @@ import (
 	"os/signal"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	mysql2 "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 )
 
@@ -38,18 +38,27 @@ func main() {
 
 func Run(cfg *config.Config) int {
 	log.Println("Setting up DB...")
-	db, err := sql.Open("mysql", cfg.PostgresDSN)
+	jst, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		log.Fatalf("Failed to load timezone for DB: %s", err.Error())
+		return exitError
+	}
+	cc := mysql2.Config{
+		DBName:    "kaleido",
+		User:      "yurie",
+		Passwd:    cfg.MysqlPassword,
+		Addr:      "docker.for.mac.localhost:3306",
+		Net:       "tcp",
+		ParseTime: true,
+		Collation: "utf8mb4_unicode_ci",
+		Loc:       jst,
+	}
+	db, err := sql.Open("mysql", cc.FormatDSN())
 	if err != nil {
 		log.Fatalf("Failed to prepare DB: %s", err.Error())
 		return exitError
 	}
 	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		log.Fatalf("Failed to health-check DB: %s", err.Error())
-		return exitError
-	}
 
 	dbClient := mysql.New(db)
 	httpClient := http.DefaultClient
@@ -58,8 +67,8 @@ func Run(cfg *config.Config) int {
 		log.Fatalf("Failed to parse url (%s): %s", cfg.FireflyBaseUrl, err.Error())
 		return exitError
 	}
-	blockchainClient := blockchain.New(httpUrl, httpClient)
-	itemService := item.New(blockchainClient, dbClient)
+	fireflyClient := firefly.New(httpUrl, httpClient)
+	itemService := item.New(fireflyClient, dbClient)
 	httpServer := http2.New(itemService)
 
 	log.Println("Setting up HTTP server...")
@@ -67,6 +76,7 @@ func Run(cfg *config.Config) int {
 	r.HandleFunc("/items/list", httpServer.ListItem).Methods("POST")
 	r.HandleFunc("/items/buy", httpServer.PurchaseItem).Methods("POST")
 	r.HandleFunc("/items/get", httpServer.GetItem).Methods("GET")
+	r.HandleFunc("/payment/approval", httpServer.ApproveTokenTransfer).Methods("POST")
 	http.Handle("/", r)
 
 	srv := &http.Server{

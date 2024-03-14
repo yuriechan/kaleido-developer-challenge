@@ -1,6 +1,7 @@
   version: '3.8'
   services:
     db:
+      container_name: db
       image: mysql:8.3
       environment:
         - MYSQL_PASSWORD=${MYSQL_PASSWORD}
@@ -9,19 +10,20 @@
         - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
         - MYSQL_DATABASE=kaleido
       ports:
-        - 3306:3306
+        - "3306:3306"
       restart: always
       volumes:
         - ./init.sh:/docker-entrypoint-initdb.d/init.sh
         - ./db_data:/var/lib/mysql:rw
     backend:
+      container_name: backend
       depends_on:
         - db
       env_file: .env
       ports:
-        - 8080:8080
-      #extra_hosts:
-      #  - "host.docker.internal:host-gateway"
+        - "8080:8080"
+      extra_hosts:
+        - "host.docker.internal:host-gateway"
       build:
         context: ./
         dockerfile: Dockerfile

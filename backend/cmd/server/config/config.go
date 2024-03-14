@@ -9,8 +9,8 @@ import (
 // Config stores configuration extracted from environmental variables by using:
 // https://github.com/kelseyhightower/envconfig
 type Config struct {
-	PostgresDSN    string `envconfig:"MYSQL_DSN" required:"true"`
 	FireflyBaseUrl string `envconfig:"FIREFLY_BASE_URL" required:"true"`
+	MysqlPassword  string `envconfig:"MYSQL_PASSWORD" required:"true"`
 }
 
 func NewConfig() (*Config, error) {
