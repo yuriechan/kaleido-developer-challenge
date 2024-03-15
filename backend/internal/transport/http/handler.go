@@ -12,7 +12,8 @@ import (
 type itemService interface {
 	GetItem(ctx context.Context, id string) (*domain.Item, error)
 	ListItem(ctx context.Context, item *domain.Item) error
-	PurchaseItem(ctx context.Context, itemID string) error
+	PurchaseItem(ctx context.Context, item *domain.Item) error
+	ApproveTransferTokenOnBehalfOfBuyer(ctx context.Context, nft *domain.NFT) error
 }
 
 type Server struct {
@@ -27,7 +28,7 @@ func New(iSvc itemService) *Server {
 
 func (s *Server) ListItem(w http.ResponseWriter, r *http.Request) {
 	var item domain.Item
-	s.unmarshalBody(&item, w, r)
+	s.unmarshalItem(&item, w, r)
 	if err := s.iSvc.ListItem(r.Context(), &item); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(fmt.Sprintf("500 - Something bad happened!: %s", err.Error())))
@@ -36,8 +37,8 @@ func (s *Server) ListItem(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) PurchaseItem(w http.ResponseWriter, r *http.Request) {
 	var item domain.Item
-	s.unmarshalBody(&item, w, r)
-	if err := s.iSvc.PurchaseItem(r.Context(), item.ID); err != nil {
+	s.unmarshalItem(&item, w, r)
+	if err := s.iSvc.PurchaseItem(r.Context(), &item); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(fmt.Sprintf("500 - Something bad happened!: %s", err.Error())))
 	}
@@ -45,7 +46,7 @@ func (s *Server) PurchaseItem(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) GetItem(w http.ResponseWriter, r *http.Request) {
 	var item domain.Item
-	s.unmarshalBody(&item, w, r)
+	s.unmarshalItem(&item, w, r)
 	resp, err := s.iSvc.GetItem(r.Context(), item.ID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -56,7 +57,30 @@ func (s *Server) GetItem(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (s *Server) unmarshalBody(item *domain.Item, w http.ResponseWriter, r *http.Request) {
+func (s *Server) ApproveTokenTransfer(w http.ResponseWriter, r *http.Request) {
+	var nft domain.NFT
+	s.unmarshalNFT(&nft, w, r)
+	if err := s.iSvc.ApproveTransferTokenOnBehalfOfBuyer(r.Context(), &nft); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf("500 - Something bad happened!: %s", err.Error())))
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+}
+
+func (s *Server) unmarshalNFT(nft *domain.NFT, w http.ResponseWriter, r *http.Request) {
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Something bad happened!"))
+	}
+	if err := json.Unmarshal(b, &nft); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Something bad happened!"))
+	}
+}
+
+func (s *Server) unmarshalItem(item *domain.Item, w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

@@ -6,12 +6,10 @@ import (
 	"fmt"
 )
 
-type blockchainClient interface {
-	CreatePool(ctx context.Context) error
-	MintToken(ctx context.Context) error
-	TransferToken(ctx context.Context) error
+type fireflyClient interface {
 	DeploySmartContract(ctx context.Context, item *domain.Item) error
-	EnableNFTForSale(ctx context.Context, contractAddress string) error
+	ApproveTokenTransfer(ctx context.Context, nft *domain.NFT) error
+	BuyNFT(ctx context.Context, contractAddress string) error
 }
 
 type dbClient interface {
@@ -22,14 +20,14 @@ type dbClient interface {
 }
 
 type Service struct {
-	blockchainClient blockchainClient
-	dbClient         dbClient
+	fireflyClient fireflyClient
+	dbClient      dbClient
 }
 
-func New(blockchainClient blockchainClient, dbClient dbClient) *Service {
+func New(fireflyClient fireflyClient, dbClient dbClient) *Service {
 	return &Service{
-		blockchainClient: blockchainClient,
-		dbClient:         dbClient,
+		fireflyClient: fireflyClient,
+		dbClient:      dbClient,
 	}
 }
 
@@ -41,36 +39,40 @@ func (s *Service) GetItem(ctx context.Context, id string) (*domain.Item, error) 
 	return resp, nil
 }
 
-// ListItem can be used for listing a new item or/and re-listing an existing item
-func (s *Service) ListItem(ctx context.Context, item *domain.Item) error {
-	// TODO: Make calls to dbClient and blockchainClient as a transaction
-	if err := s.dbClient.CreateOrUpdateItem(ctx, item); err != nil {
-		return fmt.Errorf("s.dbClient.CreateOrUpdateItem: %w", err)
-	}
-	if err := s.blockchainClient.DeploySmartContract(ctx, item); err != nil {
-		return fmt.Errorf("s.blockchainClient.DeploySmartContract: %w", err)
-	}
-	if err := s.blockchainClient.EnableNFTForSale(ctx, item.SmartContractAddress); err != nil {
-		return fmt.Errorf("s.blockchainClient.EnableNFTForSale: %w", err)
+func (s *Service) ApproveTransferTokenOnBehalfOfBuyer(ctx context.Context, nft *domain.NFT) error {
+	if err := s.fireflyClient.ApproveTokenTransfer(ctx, nft); err != nil {
+		return fmt.Errorf("s.fireflyClient.ApproveTokenTransfer: %w", err)
 	}
 	return nil
 }
 
-func (s *Service) PurchaseItem(ctx context.Context, itemID string) error {
-	resp, err := s.dbClient.GetItemByID(ctx, itemID)
-	if err != nil {
-		return fmt.Errorf("s.dbClient.GetItemByID: %w", err)
+// ListItem can be used for listing a new item or/and re-listing an existing item
+func (s *Service) ListItem(ctx context.Context, item *domain.Item) error {
+	// TODO: Make calls to dbClient and fireflyClient as a transaction
+	if err := s.dbClient.CreateOrUpdateItem(ctx, item); err != nil {
+		return fmt.Errorf("ListItem: s.dbClient.CreateOrUpdateItem: %w", err)
 	}
-	if resp.State == domain.ItemStateSold {
-		return fmt.Errorf("item cannot be called when state is ItemStateSold")
+	if err := s.fireflyClient.DeploySmartContract(ctx, item); err != nil {
+		return fmt.Errorf("ListItem: s.fireflyClient.DeploySmartContract: %w", err)
 	}
+	return nil
+}
 
-	resp.State = domain.ItemStateSold
-	if err := s.dbClient.UpdateItem(ctx, resp); err != nil {
-		return fmt.Errorf("s.dbClient.UpdateItem: %w", err)
-	}
-	if err := s.blockchainClient.TransferToken(ctx); err != nil {
-		return fmt.Errorf("s.blockchainClient.TransferToken: %w", err)
+func (s *Service) PurchaseItem(ctx context.Context, item *domain.Item) error {
+	//resp, err := s.dbClient.GetItemByID(ctx, item.ID)
+	//if err != nil {
+	//	return fmt.Errorf("s.dbClient.GetItemByID: %w", err)
+	//}
+	//if resp.State == domain.ItemStateSold {
+	//	return fmt.Errorf("item cannot be called when state is ItemStateSold")
+	//}
+	//
+	//resp.State = domain.ItemStateSold
+	//if err := s.dbClient.UpdateItem(ctx, resp); err != nil {
+	//	return fmt.Errorf("s.dbClient.UpdateItem: %w", err)
+	//}
+	if err := s.fireflyClient.BuyNFT(ctx, item.SmartContractAddress); err != nil {
+		return fmt.Errorf("s.fireflyClient.TransferToken: %w", err)
 	}
 	return nil
 }

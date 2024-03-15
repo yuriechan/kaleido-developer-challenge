@@ -22,19 +22,12 @@ func New(db *sql.DB) *Client {
 
 func (c *Client) GetItemByID(ctx context.Context, id string) (*domain.Item, error) {
 	var item domain.Item
-	var row *sql.Row
 	query := "SELECT id, name FROM items WHERE id = ?"
-	if row = c.db.QueryRow(query, id); row.Err() != nil {
-		if errors.Is(row.Err(), sql.ErrNoRows) {
+	if err := c.db.QueryRow(query, id).Scan(&item.ID, &item.Name); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
-		return nil, fmt.Errorf("c.db.QueryRow on (%s) with id (%s): %w", query, id, row.Err())
-	}
-	if err := row.Scan(&item.ID, &item.Name); err != nil {
-		if errors.Is(row.Err(), sql.ErrNoRows) {
-			return nil, domain.ErrNotFound
-		}
-		return nil, fmt.Errorf("row.Scan on (%s) with id (%s): %w", query, id, err)
+		return nil, fmt.Errorf("c.db.QueryRow on (%s) with id (%s): %w", query, id, err)
 	}
 	return &item, nil
 }

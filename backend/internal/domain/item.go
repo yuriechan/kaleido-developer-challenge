@@ -9,7 +9,7 @@ const (
 )
 
 type Item struct {
-	ID                   string    `json:"id"`
+	ID                   string    `json:"item_id"`
 	Name                 string    `json:"name"`
 	State                ItemState `json:"state"`
 	Price                int64     `json:"price"`
