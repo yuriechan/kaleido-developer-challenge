@@ -1,5 +1,18 @@
 ## About this Project - "Marketplace"
 Build a MVP for a e-commerce platform for second hand item where digitally sold items allows permanent tracing to ownership of the item.
+- Use case:
+- As a user I want to be able to track my items so that I can easily re-list and sell items I no longer need
+  - A Marketplace Wallet lets me track my items
+- As a buyer I want to be able to track how often an item is sold so I can understand it's resale value
+  - An item's prior sales shows price history and sale frequency
+- As a buyer, I want a frictionless re-listing experience so that I will sell my unused items
+  - An item's NFT maintains the metadata for re-using the same data (images, name, etc) with new listings
+- As a service, I want to increase re-sale of items so that I can grow more revenue from the sales fees
+  - A frictionless user-experience encourages re-selling items which is how we grow revenue 
+- As a service, I want transparency in items and sales so that users have more trust in buying and selling
+  - A blockchain is immutable and transparent for users to trust
+- As a user, I don't want my physical address publicly available so that my PII stays private
+  - A private database for a hybrid public/private solution allows for handling PII with transparency for public data
 
 ## 🥞 Tech Stack
 - Backend written in Go 
