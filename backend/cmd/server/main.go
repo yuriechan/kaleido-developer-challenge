@@ -94,7 +94,6 @@ func Run(cfg *config.Config) int {
 	r.HandleFunc("/items/list", httpServer.ListItem).Methods("POST")
 	r.HandleFunc("/items/buy", httpServer.PurchaseItem).Methods("POST")
 	r.HandleFunc("/items/get", httpServer.GetItem).Methods("GET")
-	r.HandleFunc("/payment/approval", httpServer.ApproveTokenTransfer).Methods("POST")
 
 	srv := &http.Server{
 		Addr:         "0.0.0.0:8080",

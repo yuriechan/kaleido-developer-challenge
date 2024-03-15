@@ -98,13 +98,11 @@ func (c *Client) DeploySmartContract(ctx context.Context, item *domain.Item) (st
 	}
 
 	u := c.port[utils.FromContext(ctx)].JoinPath(deployContractPath)
-	fmt.Println(u.String())
 	resp, err := c.httpClient.Post(u.String(), applicationJsonHeader, bytes.NewReader(b))
 	if err != nil {
 		return "", fmt.Errorf("c.httpClient.Post to (%s): %w", u.String(), err)
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
-	fmt.Println(string(bodyBytes))
 	if err != nil {
 		return "", fmt.Errorf("io.ReadAll on response from (%s): %w", u.String(), err)
 	}
@@ -128,13 +126,11 @@ type getTransactionStatusResp struct {
 
 func (c *Client) GetSmartContractLocation(ctx context.Context, trxID string) (string, error) {
 	u := c.port[utils.FromContext(ctx)].JoinPath(getTransactionPath).JoinPath(trxID).JoinPath("status")
-	fmt.Println(u.String())
 	resp, err := c.httpClient.Get(u.String())
 	if err != nil {
-		return "", fmt.Errorf("c.httpClient.Post to (%s): %w", u.String(), err)
+		return "", fmt.Errorf("c.httpClient.Get to (%s): %w", u.String(), err)
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
-	fmt.Println(string(bodyBytes))
 	if err != nil {
 		return "", fmt.Errorf("io.ReadAll on response from (%s): %w", u.String(), err)
 	}
@@ -144,12 +140,6 @@ func (c *Client) GetSmartContractLocation(ctx context.Context, trxID string) (st
 		return "", fmt.Errorf("json.Unmarshal on response from (%s): %w", u.String(), err)
 	}
 	return res.Details[0].Info.ContractLocation.Address, nil
-}
-
-type enableNFTForSaleRequest struct {
-	Location *location         `json:"location"`
-	Key      string            `json:"key"`
-	Input    map[string]string `json:"input"`
 }
 
 type location struct {
@@ -175,17 +165,13 @@ func (c *Client) ApproveTokenTransfer(ctx context.Context, item *domain.Item) er
 		Pool: nftPoolName,
 	}
 	b, err := json.Marshal(req)
-	fmt.Println(string(b))
 	if err != nil {
 		return fmt.Errorf("json.Marshal type approveTokenTransferRequest: %w", err)
 	}
+
 	u := c.port[utils.FromContext(ctx)].JoinPath(approveTokenPath)
-	fmt.Println(u.String())
-	resp, err := c.httpClient.Post(u.String(), applicationJsonHeader, bytes.NewReader(b))
-	bodyBytes, err := io.ReadAll(resp.Body)
-	fmt.Println(string(bodyBytes))
-	if err != nil {
-		return fmt.Errorf("io.ReadAll on response from (%s): %w", u.String(), err)
+	if _, err := c.httpClient.Post(u.String(), applicationJsonHeader, bytes.NewReader(b)); err != nil {
+		return fmt.Errorf("c.httpClient.Post to (%s): %w", u.String(), err)
 	}
 	return nil
 }
@@ -208,14 +194,14 @@ func (c *Client) MintToken(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("json.Marshal type mintTokenRequest: %w", err)
 	}
+
 	p := c.port[utils.FromContext(ctx)].JoinPath(mintTokenPath)
 	resp, err := c.httpClient.Post(p.String(), applicationJsonHeader, bytes.NewBuffer(b))
 	if err != nil {
 		return "", fmt.Errorf("c.httpClient.Post to (%s): %w", p.String(), err)
 	}
+
 	bodyBytes, err := io.ReadAll(resp.Body)
-	fmt.Println("--------------- after mint")
-	fmt.Println(string(bodyBytes))
 	if err != nil {
 		return "", fmt.Errorf("io.ReadAll on response from (%s): %w", p.String(), err)
 	}
@@ -223,7 +209,6 @@ func (c *Client) MintToken(ctx context.Context) (string, error) {
 	if err = json.Unmarshal(bodyBytes, &res); err != nil {
 		return "", fmt.Errorf("json.Unmarshal on response from (%s): %w", p.String(), err)
 	}
-	fmt.Println(res.TokenIndex)
 	return res.TokenIndex, nil
 }
 
@@ -236,21 +221,13 @@ type buyNFTLocation struct {
 func (c *Client) BuyNFT(ctx context.Context, contractAddress string) error {
 	req := buyNFTLocation{Location: location{ContractAddress: contractAddress}}
 	b, err := json.Marshal(req)
-	fmt.Println(string(b))
 	if err != nil {
 		return fmt.Errorf("json.Marshal type location: %w", err)
 	}
 
 	u := c.port[utils.FromContext(ctx)].JoinPath(buyNFTPath)
-	fmt.Println(u.String())
-	resp, err := c.httpClient.Post(u.String(), applicationJsonHeader, bytes.NewReader(b))
-	if err != nil {
+	if _, err := c.httpClient.Post(u.String(), applicationJsonHeader, bytes.NewReader(b)); err != nil {
 		return fmt.Errorf("c.httpClient.Post to (%s): %w", u.String(), err)
-	}
-	bodyBytes, err := io.ReadAll(resp.Body)
-	fmt.Println(string(bodyBytes))
-	if err != nil {
-		return fmt.Errorf("io.ReadAll on response from (%s): %w", u.String(), err)
 	}
 	return nil
 }

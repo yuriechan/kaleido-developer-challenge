@@ -22,8 +22,6 @@ func New(db *sql.DB) *Client {
 
 func (c *Client) GetItemByID(ctx context.Context, id string) (*domain.Item, error) {
 	var item domain.Item
-	fmt.Println("inside infra before query")
-	fmt.Println(id)
 	query := "SELECT id, item_name, item_state, item_price, nft_id, smart_contract_address FROM listing WHERE id = ?"
 	if err := c.db.QueryRow(query, id).Scan(&item.ID, &item.Name, &item.State, &item.Price, &item.NFTID, &item.SmartContractAddress); err != nil {
 		if errors.As(err, sql.ErrNoRows) {
@@ -31,8 +29,6 @@ func (c *Client) GetItemByID(ctx context.Context, id string) (*domain.Item, erro
 		}
 		return nil, fmt.Errorf("c.db.QueryRow on (%s) with id (%s): %w", query, id, err)
 	}
-	fmt.Println("inside infra after query")
-	fmt.Println(item.ID)
 	return &item, nil
 }
 
@@ -68,6 +64,7 @@ func (c *Client) CreateOrUpdateItem(ctx context.Context, item *domain.Item) erro
 	selectQuery := "SELECT id FROM listing WHERE id = ?"
 	var isCreated bool
 	var id string
+	item.State = domain.ItemStateListed
 	if err := c.db.QueryRow(selectQuery, item.ID).Scan(&id); errors.Is(err, sql.ErrNoRows) {
 		insertQuery := "INSERT INTO listing (id, item_name, item_state, item_price, smart_contract_address, nft_id) VALUES (?, ?, ?, ?, ?, ?)"
 		item.ID = uuid.NewString()
