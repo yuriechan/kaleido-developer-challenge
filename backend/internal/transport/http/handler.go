@@ -47,6 +47,8 @@ func (s *Server) PurchaseItem(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GetItem(w http.ResponseWriter, r *http.Request) {
 	var item domain.Item
 	s.unmarshalItem(&item, w, r)
+	fmt.Println("inside handler")
+	fmt.Println(item.ID)
 	resp, err := s.iSvc.GetItem(r.Context(), item.ID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

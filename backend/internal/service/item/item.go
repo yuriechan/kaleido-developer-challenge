@@ -4,12 +4,15 @@ import (
 	"backend/internal/domain"
 	"context"
 	"fmt"
+	"time"
 )
 
 type fireflyClient interface {
-	DeploySmartContract(ctx context.Context, item *domain.Item) error
-	ApproveTokenTransfer(ctx context.Context, nft *domain.NFT) error
+	DeploySmartContract(ctx context.Context, item *domain.Item) (string, error)
+	ApproveTokenTransfer(ctx context.Context, item *domain.Item) error
 	BuyNFT(ctx context.Context, contractAddress string) error
+	MintToken(ctx context.Context) (string, error)
+	GetSmartContractLocation(ctx context.Context, trxID string) (string, error)
 }
 
 type dbClient interface {
@@ -40,39 +43,55 @@ func (s *Service) GetItem(ctx context.Context, id string) (*domain.Item, error) 
 }
 
 func (s *Service) ApproveTransferTokenOnBehalfOfBuyer(ctx context.Context, nft *domain.NFT) error {
-	if err := s.fireflyClient.ApproveTokenTransfer(ctx, nft); err != nil {
-		return fmt.Errorf("s.fireflyClient.ApproveTokenTransfer: %w", err)
-	}
 	return nil
 }
 
 // ListItem can be used for listing a new item or/and re-listing an existing item
 func (s *Service) ListItem(ctx context.Context, item *domain.Item) error {
-	// TODO: Make calls to dbClient and fireflyClient as a transaction
 	if err := s.dbClient.CreateOrUpdateItem(ctx, item); err != nil {
 		return fmt.Errorf("ListItem: s.dbClient.CreateOrUpdateItem: %w", err)
 	}
-	if err := s.fireflyClient.DeploySmartContract(ctx, item); err != nil {
+
+	trxID, err := s.fireflyClient.DeploySmartContract(ctx, item)
+	if err != nil {
 		return fmt.Errorf("ListItem: s.fireflyClient.DeploySmartContract: %w", err)
+	}
+
+	time.Sleep(time.Second * 5)
+	clocation, err := s.fireflyClient.GetSmartContractLocation(ctx, trxID)
+	if err != nil {
+		return fmt.Errorf("ListItem: s.fireflyClient.GetSmartContractLocation: %w", err)
+	}
+
+	item.SmartContractAddress = clocation
+	fmt.Println("item.SmartContractAddress-------")
+	fmt.Println(item.SmartContractAddress)
+	if err := s.dbClient.UpdateItem(ctx, item); err != nil {
+		return fmt.Errorf("ListItem: s.dbClient.UpdateItem: %w", err)
+	}
+
+	if err := s.fireflyClient.ApproveTokenTransfer(ctx, item); err != nil {
+		return fmt.Errorf("s.fireflyClient.ApproveTokenTransfer: %w", err)
 	}
 	return nil
 }
 
 func (s *Service) PurchaseItem(ctx context.Context, item *domain.Item) error {
-	//resp, err := s.dbClient.GetItemByID(ctx, item.ID)
-	//if err != nil {
-	//	return fmt.Errorf("s.dbClient.GetItemByID: %w", err)
-	//}
+	fmt.Println(item.ID)
+	resp, err := s.dbClient.GetItemByID(ctx, item.ID)
+	if err != nil {
+		return fmt.Errorf("s.dbClient.GetItemByID: %w", err)
+	}
 	//if resp.State == domain.ItemStateSold {
 	//	return fmt.Errorf("item cannot be called when state is ItemStateSold")
 	//}
 	//
-	//resp.State = domain.ItemStateSold
-	//if err := s.dbClient.UpdateItem(ctx, resp); err != nil {
-	//	return fmt.Errorf("s.dbClient.UpdateItem: %w", err)
-	//}
-	if err := s.fireflyClient.BuyNFT(ctx, item.SmartContractAddress); err != nil {
+	if err := s.fireflyClient.BuyNFT(ctx, resp.SmartContractAddress); err != nil {
 		return fmt.Errorf("s.fireflyClient.TransferToken: %w", err)
+	}
+	resp.State = domain.ItemStateSold
+	if err := s.dbClient.UpdateItem(ctx, resp); err != nil {
+		return fmt.Errorf("s.dbClient.UpdateItem: %w", err)
 	}
 	return nil
 }

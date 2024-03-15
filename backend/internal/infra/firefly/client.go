@@ -12,13 +12,14 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"time"
 )
 
 type Client struct {
 	httpClient *http.Client
 	port       uidToHTTPPort
 }
+
+type uidToHTTPPort map[string]*url.URL
 
 func New(u1, u2, u3 *url.URL, httpClient *http.Client) *Client {
 	return &Client{
@@ -35,25 +36,24 @@ func New(u1, u2, u3 *url.URL, httpClient *http.Client) *Client {
 const (
 	createPoolPath        = "tokens/pools"
 	mintTokenPath         = "tokens/mint"
-	transferTokenPath     = "tokens/transfers"
 	approveTokenPath      = "tokens/approvals"
 	applicationJsonHeader = "application/json"
 
 	deployContractPath = "contracts/deploy"
+	getTransactionPath = "transactions"
 
-	createNFTPath = "apis/marketplace/invoke/createNFT"
-	buyNFTPath    = "apis/marketplace/invoke/buyNFT"
-	nftPoolName   = "kaleido"
-	nftType       = "nonfungible"
-	defaultUserID = "1"
+	buyNFTPath       = "apis/marketplace/invoke/buyNFT"
+	nftPoolName      = "kaleido"
+	nftPoolID        = "0xd9d2f32fecdbcaa40b48b03132dc1023fa63d171"
+	nftDefaultAmount = "1"
+	nftType          = "nonfungible"
+	defaultUserID    = "1"
 )
 
 type createPoolRequest struct {
 	PoolName string `json:"name"`
 	PoolType string `json:"type"`
 }
-
-type uidToHTTPPort map[string]*url.URL
 
 func (c *Client) CreatePool(_ context.Context) error {
 	// For now, we default to using the user ID 1's port number for token pool creation
@@ -80,55 +80,13 @@ type deploySmartContractRequest struct {
 }
 
 type deploySmartContractResponse struct {
-	ID        string `json:"id"`
-	Namespace string `json:"namespace"`
-	Tx        string `json:"tx"`
-	Type      string `json:"type"`
-	Status    string `json:"status"`
-	Plugin    string `json:"plugin"`
-	Input     struct {
-		Contract   string `json:"contract"`
-		Definition []struct {
-			Inputs []struct {
-				InternalType string `json:"internalType"`
-				Name         string `json:"name"`
-				Type         string `json:"type"`
-			} `json:"inputs"`
-			StateMutability string `json:"stateMutability,omitempty"`
-			Type            string `json:"type"`
-			Anonymous       bool   `json:"anonymous,omitempty"`
-			Name            string `json:"name,omitempty"`
-			Outputs         []struct {
-				InternalType string `json:"internalType"`
-				Name         string `json:"name"`
-				Type         string `json:"type"`
-			} `json:"outputs,omitempty"`
-		} `json:"definition"`
-		Input   []string `json:"input"`
-		Key     string   `json:"key"`
-		Options any      `json:"options"`
-	} `json:"input"`
-	Output struct {
-		Headers struct {
-			RequestID string `json:"requestId"`
-			Type      string `json:"type"`
-		} `json:"headers"`
-		ContractLocation struct {
-			Address string `json:"address"`
-		} `json:"contractLocation"`
-		ProtocolID      string `json:"protocolId"`
-		TransactionHash string `json:"transactionHash"`
-	} `json:"output"`
-	Created time.Time `json:"created"`
-	Updated time.Time `json:"updated"`
+	Tx string `json:"tx"`
 }
 
-func (c *Client) DeploySmartContract(ctx context.Context, item *domain.Item) error {
+func (c *Client) DeploySmartContract(ctx context.Context, item *domain.Item) (string, error) {
 	var input []string
 	// TODO: Add logic when NFT data is empty
-	// TODO: Need to confirm what is NFT Address ID on Firefly Web UI
-	// TODO: Listen to events after call to /deploy to retrieve location address during run time
-	input = append(input, item.NFTAddressID, item.NFTID, strconv.Itoa(int(item.Price)))
+	input = append(input, nftPoolID, item.NFTID, strconv.Itoa(int(item.Price)))
 	req := deploySmartContractRequest{
 		Contract:   contracts.GetMarketplaceBin(),
 		Definition: contracts.GetMarketplaceABI(),
@@ -136,26 +94,56 @@ func (c *Client) DeploySmartContract(ctx context.Context, item *domain.Item) err
 	}
 	b, err := json.Marshal(req)
 	if err != nil {
-		return fmt.Errorf("json.Marshal type deploySmartContractRequest: %w", err)
+		return "", fmt.Errorf("json.Marshal type deploySmartContractRequest: %w", err)
 	}
 
 	u := c.port[utils.FromContext(ctx)].JoinPath(deployContractPath)
 	fmt.Println(u.String())
 	resp, err := c.httpClient.Post(u.String(), applicationJsonHeader, bytes.NewReader(b))
 	if err != nil {
-		return fmt.Errorf("c.httpClient.Post to (%s): %w", u.String(), err)
+		return "", fmt.Errorf("c.httpClient.Post to (%s): %w", u.String(), err)
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 	fmt.Println(string(bodyBytes))
 	if err != nil {
-		return fmt.Errorf("io.ReadAll on response from (%s): %w", u.String(), err)
+		return "", fmt.Errorf("io.ReadAll on response from (%s): %w", u.String(), err)
 	}
 
-	//var res deploySmartContractResponse
-	//if err := json.Unmarshal(bodyBytes, &res); err != nil {
-	//	return fmt.Errorf("json.Unmarshal on response from (%s): %w", u.String(), err)
-	//}
-	return nil
+	var res deploySmartContractResponse
+	if err := json.Unmarshal(bodyBytes, &res); err != nil {
+		return "", fmt.Errorf("json.Unmarshal on response from (%s): %w", u.String(), err)
+	}
+	return res.Tx, nil
+}
+
+type getTransactionStatusResp struct {
+	Details []struct {
+		Info struct {
+			ContractLocation struct {
+				Address string `json:"address"`
+			} `json:"contractLocation"`
+		} `json:"info"`
+	} `json:"details"`
+}
+
+func (c *Client) GetSmartContractLocation(ctx context.Context, trxID string) (string, error) {
+	u := c.port[utils.FromContext(ctx)].JoinPath(getTransactionPath).JoinPath(trxID).JoinPath("status")
+	fmt.Println(u.String())
+	resp, err := c.httpClient.Get(u.String())
+	if err != nil {
+		return "", fmt.Errorf("c.httpClient.Post to (%s): %w", u.String(), err)
+	}
+	bodyBytes, err := io.ReadAll(resp.Body)
+	fmt.Println(string(bodyBytes))
+	if err != nil {
+		return "", fmt.Errorf("io.ReadAll on response from (%s): %w", u.String(), err)
+	}
+
+	var res getTransactionStatusResp
+	if err := json.Unmarshal(bodyBytes, &res); err != nil {
+		return "", fmt.Errorf("json.Unmarshal on response from (%s): %w", u.String(), err)
+	}
+	return res.Details[0].Info.ContractLocation.Address, nil
 }
 
 type enableNFTForSaleRequest struct {
@@ -176,13 +164,13 @@ type approveTokenTransferRequest struct {
 	Pool string `json:"pool"`
 }
 
-func (c *Client) ApproveTokenTransfer(ctx context.Context, nft *domain.NFT) error {
+func (c *Client) ApproveTokenTransfer(ctx context.Context, item *domain.Item) error {
 	req := approveTokenTransferRequest{
-		Operator: nft.SmartContractID,
+		Operator: item.SmartContractAddress,
 		Config: struct {
 			TokenID string `json:"tokenIndex"`
 		}{
-			TokenID: strconv.Itoa(int(nft.ID)),
+			TokenID: item.NFTID,
 		},
 		Pool: nftPoolName,
 	}
@@ -202,18 +190,41 @@ func (c *Client) ApproveTokenTransfer(ctx context.Context, nft *domain.NFT) erro
 	return nil
 }
 
-func (c *Client) MintToken(ctx context.Context, uid string) error {
-	p := c.port[utils.FromContext(ctx)].JoinPath(mintTokenPath)
-	body := []byte(`{
-		"pool": "kaleido",
-		"amount": "1"
-	  }`)
-	_, err := c.httpClient.Post(p.String(), applicationJsonHeader, bytes.NewBuffer(body))
-	if err != nil {
-		return fmt.Errorf("c.httpClient.Post to (%s): %w", p, err)
+type mintTokenRequest struct {
+	Pool   string `json:"pool"`
+	Amount string `json:"amount"`
+}
+
+type mintTokenResponse struct {
+	TokenIndex string `json:"tokenIndex"`
+}
+
+func (c *Client) MintToken(ctx context.Context) (string, error) {
+	req := mintTokenRequest{
+		Pool:   nftPoolName,
+		Amount: nftDefaultAmount,
 	}
-	// TODO: store IDs into DB
-	return nil
+	b, err := json.Marshal(req)
+	if err != nil {
+		return "", fmt.Errorf("json.Marshal type mintTokenRequest: %w", err)
+	}
+	p := c.port[utils.FromContext(ctx)].JoinPath(mintTokenPath)
+	resp, err := c.httpClient.Post(p.String(), applicationJsonHeader, bytes.NewBuffer(b))
+	if err != nil {
+		return "", fmt.Errorf("c.httpClient.Post to (%s): %w", p.String(), err)
+	}
+	bodyBytes, err := io.ReadAll(resp.Body)
+	fmt.Println("--------------- after mint")
+	fmt.Println(string(bodyBytes))
+	if err != nil {
+		return "", fmt.Errorf("io.ReadAll on response from (%s): %w", p.String(), err)
+	}
+	var res mintTokenResponse
+	if err = json.Unmarshal(bodyBytes, &res); err != nil {
+		return "", fmt.Errorf("json.Unmarshal on response from (%s): %w", p.String(), err)
+	}
+	fmt.Println(res.TokenIndex)
+	return res.TokenIndex, nil
 }
 
 type buyNFTLocation struct {
