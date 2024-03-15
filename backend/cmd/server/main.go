@@ -5,6 +5,7 @@ import (
 	_ "backend/contracts"
 	"backend/internal/infra/firefly"
 	"backend/internal/infra/mysql"
+	"backend/internal/middleware"
 	"backend/internal/service/item"
 	http2 "backend/internal/transport/http"
 	"context"
@@ -62,22 +63,38 @@ func Run(cfg *config.Config) int {
 
 	dbClient := mysql.New(db)
 	httpClient := http.DefaultClient
-	httpUrl, err := url.Parse(cfg.FireflyBaseUrl)
+	httpUrl1, err := url.Parse(cfg.FireflyBaseUrlUserOne)
 	if err != nil {
-		log.Fatalf("Failed to parse url (%s): %s", cfg.FireflyBaseUrl, err.Error())
+		log.Fatalf("Failed to parse url (%s): %s", cfg.FireflyBaseUrlUserOne, err.Error())
 		return exitError
 	}
-	fireflyClient := firefly.New(httpUrl, httpClient)
+	httpUrl2, err := url.Parse(cfg.FireflyBaseUrlUserTwo)
+	if err != nil {
+		log.Fatalf("Failed to parse url (%s): %s", cfg.FireflyBaseUrlUserTwo, err.Error())
+		return exitError
+	}
+	httpUrl3, err := url.Parse(cfg.FireflyBaseUrlUserThree)
+	if err != nil {
+		log.Fatalf("Failed to parse url (%s): %s", cfg.FireflyBaseUrlUserThree, err.Error())
+		return exitError
+	}
+	fireflyClient := firefly.New(httpUrl1, httpUrl2, httpUrl3, httpClient)
 	itemService := item.New(fireflyClient, dbClient)
 	httpServer := http2.New(itemService)
 
+	log.Println("Creating NFT pool...")
+	if err := fireflyClient.CreatePool(context.Background()); err != nil {
+		log.Fatalf("Failed to create pool for NFT via Firefly: %s", err.Error())
+		return exitError
+	}
+
 	log.Println("Setting up HTTP server...")
 	r := mux.NewRouter()
+	r.Use(middleware.SetUserID)
 	r.HandleFunc("/items/list", httpServer.ListItem).Methods("POST")
 	r.HandleFunc("/items/buy", httpServer.PurchaseItem).Methods("POST")
 	r.HandleFunc("/items/get", httpServer.GetItem).Methods("GET")
 	r.HandleFunc("/payment/approval", httpServer.ApproveTokenTransfer).Methods("POST")
-	http.Handle("/", r)
 
 	srv := &http.Server{
 		Addr:         "0.0.0.0:8080",

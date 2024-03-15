@@ -1,8 +1,9 @@
-package blockchain
+package firefly
 
 import (
 	"backend/contracts"
 	"backend/internal/domain"
+	"backend/internal/utils"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -15,14 +16,19 @@ import (
 )
 
 type Client struct {
-	url        *url.URL
 	httpClient *http.Client
+	port       uidToHTTPPort
 }
 
-func New(u *url.URL, httpClient *http.Client) *Client {
+func New(u1, u2, u3 *url.URL, httpClient *http.Client) *Client {
 	return &Client{
-		url:        u,
 		httpClient: httpClient,
+		// For now, we use fixed userID
+		port: uidToHTTPPort{
+			"1": u1,
+			"2": u2,
+			"3": u3,
+		},
 	}
 }
 
@@ -30,31 +36,47 @@ const (
 	createPoolPath        = "tokens/pools"
 	mintTokenPath         = "tokens/mint"
 	transferTokenPath     = "tokens/transfers"
+	approveTokenPath      = "tokens/approvals"
 	applicationJsonHeader = "application/json"
 
 	deployContractPath = "contracts/deploy"
 
 	createNFTPath = "apis/marketplace/invoke/createNFT"
+	buyNFTPath    = "apis/marketplace/invoke/buyNFT"
+	nftPoolName   = "kaleido"
+	nftType       = "nonfungible"
+	defaultUserID = "1"
 )
 
-// TODO: Call this endpoint after HTTP server is up and running, before accepting requests
-func (c *Client) CreatePool(ctx context.Context) error {
-	p := c.url.JoinPath(createPoolPath)
-	body := []byte(`{
-		"name": "kaleido",
-		"type": "nonfungible"
-	  }`)
-	_, err := c.httpClient.Post(p.String(), applicationJsonHeader, bytes.NewBuffer(body))
+type createPoolRequest struct {
+	PoolName string `json:"name"`
+	PoolType string `json:"type"`
+}
+
+type uidToHTTPPort map[string]*url.URL
+
+func (c *Client) CreatePool(_ context.Context) error {
+	// For now, we default to using the user ID 1's port number for token pool creation
+	p := c.port[defaultUserID].JoinPath(createPoolPath)
+	req := createPoolRequest{
+		PoolName: nftPoolName,
+		PoolType: nftType,
+	}
+	b, err := json.Marshal(req)
 	if err != nil {
+		return fmt.Errorf("json.Marshal type createPoolRequest: %w", err)
+	}
+	if _, err = c.httpClient.Post(p.String(), applicationJsonHeader, bytes.NewBuffer(b)); err != nil {
 		return fmt.Errorf("c.httpClient.Post to (%s): %w", p, err)
 	}
 	return nil
 }
 
 type deploySmartContractRequest struct {
-	Contract   string                     `json:"contract"`
-	Definition contracts.SmartContractABI `json:"definition"`
-	Input      []string                   `json:"input"`
+	Contract       string                     `json:"contract"`
+	Definition     contracts.SmartContractABI `json:"definition"`
+	Input          []string                   `json:"input"`
+	IdempotencyKey string                     `json:"idempotencyKey"`
 }
 
 type deploySmartContractResponse struct {
@@ -103,6 +125,9 @@ type deploySmartContractResponse struct {
 
 func (c *Client) DeploySmartContract(ctx context.Context, item *domain.Item) error {
 	var input []string
+	// TODO: Add logic when NFT data is empty
+	// TODO: Need to confirm what is NFT Address ID on Firefly Web UI
+	// TODO: Listen to events after call to /deploy to retrieve location address during run time
 	input = append(input, item.NFTAddressID, item.NFTID, strconv.Itoa(int(item.Price)))
 	req := deploySmartContractRequest{
 		Contract:   contracts.GetMarketplaceBin(),
@@ -114,7 +139,7 @@ func (c *Client) DeploySmartContract(ctx context.Context, item *domain.Item) err
 		return fmt.Errorf("json.Marshal type deploySmartContractRequest: %w", err)
 	}
 
-	u := c.url.JoinPath(deployContractPath)
+	u := c.port[utils.FromContext(ctx)].JoinPath(deployContractPath)
 	fmt.Println(u.String())
 	resp, err := c.httpClient.Post(u.String(), applicationJsonHeader, bytes.NewReader(b))
 	if err != nil {
@@ -126,10 +151,10 @@ func (c *Client) DeploySmartContract(ctx context.Context, item *domain.Item) err
 		return fmt.Errorf("io.ReadAll on response from (%s): %w", u.String(), err)
 	}
 
-	// var res deploySmartContractResponse
-	// if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-	// 	return fmt.Errorf("json.NewDecoder on response from (%s): %w", u.String(), err)
-	// }
+	//var res deploySmartContractResponse
+	//if err := json.Unmarshal(bodyBytes, &res); err != nil {
+	//	return fmt.Errorf("json.Unmarshal on response from (%s): %w", u.String(), err)
+	//}
 	return nil
 }
 
@@ -143,35 +168,42 @@ type location struct {
 	ContractAddress string `json:"address"`
 }
 
-func (c *Client) EnableNFTForSale(ctx context.Context, contractAddress string) error {
-	req := enableNFTForSaleRequest{
-		Location: &location{
-			ContractAddress: contractAddress,
+type approveTokenTransferRequest struct {
+	Operator string `json:"operator"`
+	Config   struct {
+		TokenID string `json:"tokenIndex"`
+	} `json:"config"`
+	Pool string `json:"pool"`
+}
+
+func (c *Client) ApproveTokenTransfer(ctx context.Context, nft *domain.NFT) error {
+	req := approveTokenTransferRequest{
+		Operator: nft.SmartContractID,
+		Config: struct {
+			TokenID string `json:"tokenIndex"`
+		}{
+			TokenID: strconv.Itoa(int(nft.ID)),
 		},
+		Pool: nftPoolName,
 	}
 	b, err := json.Marshal(req)
 	fmt.Println(string(b))
 	if err != nil {
-		return fmt.Errorf("json.Marshal type enableNFTForSaleRequest: %w", err)
+		return fmt.Errorf("json.Marshal type approveTokenTransferRequest: %w", err)
 	}
-
-	u := c.url.JoinPath(createNFTPath)
+	u := c.port[utils.FromContext(ctx)].JoinPath(approveTokenPath)
 	fmt.Println(u.String())
 	resp, err := c.httpClient.Post(u.String(), applicationJsonHeader, bytes.NewReader(b))
-	if err != nil {
-		return fmt.Errorf("c.httpClient.Post to (%s): %w", u.String(), err)
-	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 	fmt.Println(string(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("io.ReadAll on response from (%s): %w", u.String(), err)
 	}
-
 	return nil
 }
 
-func (c *Client) MintToken(ctx context.Context) error {
-	p := c.url.JoinPath(mintTokenPath)
+func (c *Client) MintToken(ctx context.Context, uid string) error {
+	p := c.port[utils.FromContext(ctx)].JoinPath(mintTokenPath)
 	body := []byte(`{
 		"pool": "kaleido",
 		"amount": "1"
@@ -184,19 +216,30 @@ func (c *Client) MintToken(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) TransferToken(ctx context.Context) error {
-	p := c.url.JoinPath(transferTokenPath)
-	// TODO: recipient address should be dynamic
-	body := []byte(`{
-		pool: 'kaleido',
-		to: '0x2c499018bb8bc8a56065c07daeff4bceec254928',
-		tokenIndex: '1',
-		amount: '1',
-	  }`)
-	_, err := c.httpClient.Post(p.String(), applicationJsonHeader, bytes.NewBuffer(body))
+type buyNFTLocation struct {
+	Location struct {
+		ContractAddress string `json:"address"`
+	} `json:"location"`
+}
+
+func (c *Client) BuyNFT(ctx context.Context, contractAddress string) error {
+	req := buyNFTLocation{Location: location{ContractAddress: contractAddress}}
+	b, err := json.Marshal(req)
+	fmt.Println(string(b))
 	if err != nil {
-		return fmt.Errorf("c.httpClient.Post to (%s): %w", p, err)
+		return fmt.Errorf("json.Marshal type location: %w", err)
 	}
-	// TODO: store IDs into DB
+
+	u := c.port[utils.FromContext(ctx)].JoinPath(buyNFTPath)
+	fmt.Println(u.String())
+	resp, err := c.httpClient.Post(u.String(), applicationJsonHeader, bytes.NewReader(b))
+	if err != nil {
+		return fmt.Errorf("c.httpClient.Post to (%s): %w", u.String(), err)
+	}
+	bodyBytes, err := io.ReadAll(resp.Body)
+	fmt.Println(string(bodyBytes))
+	if err != nil {
+		return fmt.Errorf("io.ReadAll on response from (%s): %w", u.String(), err)
+	}
 	return nil
 }

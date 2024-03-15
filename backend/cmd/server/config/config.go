@@ -9,8 +9,10 @@ import (
 // Config stores configuration extracted from environmental variables by using:
 // https://github.com/kelseyhightower/envconfig
 type Config struct {
-	FireflyBaseUrl string `envconfig:"FIREFLY_BASE_URL" required:"true"`
-	MysqlPassword  string `envconfig:"MYSQL_PASSWORD" required:"true"`
+	FireflyBaseUrlUserOne   string `envconfig:"FIREFLY_BASE_URL_USER_ONE" required:"true"`
+	FireflyBaseUrlUserTwo   string `envconfig:"FIREFLY_BASE_URL_USER_TWO" required:"true"`
+	FireflyBaseUrlUserThree string `envconfig:"FIREFLY_BASE_URL_USER_THREE" required:"true"`
+	MysqlPassword           string `envconfig:"MYSQL_PASSWORD" required:"true"`
 }
 
 func NewConfig() (*Config, error) {
