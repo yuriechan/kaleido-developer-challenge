@@ -1,92 +1,51 @@
-# Developer Challenge
+## About this Project - "Marketplace"
+Build a MVP for a e-commerce platform for second hand item where digitally sold items allows permanent tracing to ownership of the item.
 
-Build a DApp on using FireFly.
+## 🥞 Tech Stack
+- Backend written in Go 
+- DB uses Mysql
+- Smart Contract written in Solidity 
+- Uses Firefly API to interact with ethereum
 
-Fork this repo, choose a use case you think would be interesting to build as a decentralized application (DApp), then get creative and have fun.
+## 🎁 Feature
+- HTTP endpoint to
+ - mint NFT associated to your physical / digital item 
+ - buy NFT that is available in the marketplace
 
-... and please **ask questions** - we don't want you to be stuck, and appreciate collaboration through the project.
+## 🎡 Things I have considered during the development
+- Using docker compose for the ease of running this project
+- Applying onion architecture to keep the codebase maintainable, taking advantages of Go's interface 
+- Identifying what type of data should be stored off-chain vs on-chain
 
-## What is a DApp?
+## 💡 Learning Experience
+- Having a marketplace means it acts as an intermediary between the seller and buyer, which requires approval from the users for the marketplace to invoke events on smart contract on behalf of the users. 
+- Multiple instances of the smart contract can be deployed to different addresses, allowing each item listing to have its own dedicated NFT attached to it.
+- There are many ways to interact with ethereum account to achieve MVP - transferring directly from user A to user B VS transferring from user A to smart contract, and smart contract to user B 
 
-- [Ethereum Foundation](https://ethereum.org/en/developers/docs/dapps/)
-  - Background of how DApps have evolved in the wild, and why
-- [DApps Build on Ethereum](https://ethereum.org/en/dapps/)
-  - All that's been built in the wonderful world of public Ethereum
-- [FireFly docs](https://docs.kaleido.io/kaleido-platform/full-stack/dapps/)
-  - DApps in an Enterprise context
+## 🚧 Fix needed - Thought for better service design 
+- Use event listeners to listen to status update on a blockchain node - this allows asynchronously handling event update while processing user requests.
+- Implement payment features where digital asset is transferred alongside the NFT transfer.
+- User authentication via wallet for more secure approach to handling asset associated to the user. 
+- Expand more features to thoroughly cover the user journey - users experience extends to not only buying / selling but also item shipment, item returns, and payment.
 
-## What does done look like?
-
-We would like your project to demonstrate your concept end-to-end, but it doesn't need to be a complete application.
-
-It must:
-
-- Have a Web based frontend user experience which talks to your app's backend
-- Have a backend-for-the-frontend (BFF), that uses FireFly's API
-  - Note: An SDK including API wrappers and a WebSocket event listener is provided for Node.js and includes type definitions for TypeScript. You are not required to use it, but we strongly recommend it as it will save you a lot of time.
-- Use Hyperledger FireFly
-- Have on-chain Smart Contract logic, written in Solidity
-- Contain a README that gives a quick overview of the use case, and tells us how to run it
-
-How much time you spend on each tier is down to you - depending on your interests and the skills you want to show.
-
-> We've given you a basic, but functional, starting point for each layer of the stack.
-> ... and yes, we know the UI is a bit naff ;-)
-
-## Some ideas
-
-These are just ideas to give inspiration
-
-Choose something/anything you think is interesting, and gives you license to focus on the bit of the stack you care about.
-
-It's your choice whether you focus more on how things work under the covers, or how things feel in the UI/UX.
-
-- A blockchain backed ratings system for Movies
-- A racing simulation (you can even see one here in our [Racecourse sample](https://github.com/kaleido-io/racecourse))
-- A funky avatar generator, where each avatar is backed by a unique token
-- A conference ticketing system with camera & QR code integration
-- A digital collectable swag bag, earned by posting to social media
-
-## Want more dev stack?
-
-Here are some dev technologies (not in the starter repo) that we love at Kaleido:
-
-- TailwindCSS or Material UI (or insert your favorite component library here) - at Kaleido we love re-use
-- GraphQL (Apollo) for front-end/back-end comms
-- WebSockets for live updating and notifications
-- PostgreSQL for relational data
-- MongoDB NoSQL database for configuration and local state
-
-Remember we'd like a thin thread through your DApp, so choose technologies you think you can be productive in.
-
-Want to throw away most of the original `create-react-app` + `express` based repo?
-No problem. Go for it.
-
-## Setting up your FireFly on your machine
-
-Run through our [Getting Started guide](https://hyperledger.github.io/firefly/gettingstarted/).
-
-When you're done, you will have FireFly and all its microservices, including your very own private blockchain, running on your machine.
-
-## Getting this repo up and running
-
-This repo has two directories in it:
-
-- `backend`: A very simple TypeScript Node.js app that uses the FireFly SDK to interact with a custom smart contract
-- `frontend`: A TypeScript React UI bootstrapped with [create-react-app](https://github.com/facebook/create-react-app) that calls the API in the backend.
-
-To run these, `cd` into each directory and run:
-
-```
-npm install
-npm start
+## 🚀 Project setup
+1. Install [direnv](https://github.com/direnv/direnv#install) following the installation step. <br>
+Once installation is complete, run:
+```shell
+$ cd backend 
+$ cp .env_sample .env 
+$ vi .env # Add value to each ENV 
+$ direnv allow 
 ```
 
-When the backend starts it will set up a contract using the FireFly SDK automatically. The buttons on the Web UI will call the backend API endpoints to set and get a value from the blockchain.
+2. Install Firefly CLI following this [guide](https://hyperledger.github.io/firefly/gettingstarted/).
+- After running its sandbox environment, you must deploy the smart contract available under `backend/contracts/marketplace.sol`
+- Also, generate Firefly's autogenerated interface to interact with the deployed smart contract 
 
-![Backend](backend.png)
-![Frontend](frontend.png)
-
-## Your journey begins here
-
-Now it's your turn to build something! You can use this backend and frontend as a starting point for your app, or you can start from scratch if you want.
+3. Start up the project using Docker compose 
+```shell 
+$ cd backend 
+$ make docker-compose-up 
+$ make docker-compose-down 
+```
+- To kill the server, use `make docker-compose-down` instead.
