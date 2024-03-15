@@ -13,7 +13,6 @@ type itemService interface {
 	GetItem(ctx context.Context, id string) (*domain.Item, error)
 	ListItem(ctx context.Context, item *domain.Item) error
 	PurchaseItem(ctx context.Context, item *domain.Item) error
-	ApproveTransferTokenOnBehalfOfBuyer(ctx context.Context, nft *domain.NFT) error
 }
 
 type Server struct {
