@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"backend/internal/utils"
-	"fmt"
 	"net/http"
 )
 
@@ -14,8 +13,6 @@ func SetUserID(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		fmt.Println("-----------------")
-		fmt.Println(uid)
 		ctx := utils.NewContext(r.Context(), uid)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
