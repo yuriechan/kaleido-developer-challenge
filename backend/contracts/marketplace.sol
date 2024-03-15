@@ -128,52 +128,58 @@ interface IERC721 {
 }
 
 contract Marketplace {
-    event Stuff(address seller, address owner);
     event NFTListed(address indexed seller, uint256 indexed nftId);
     event NFTBought(address indexed buyer, address indexed seller, uint256 indexed nftId, uint256 price);
 
     IERC721 public nft;
     uint256 public nftId;
-
     address payable public seller;
     bool public onSale;
-
-    address public buyer;
     uint256 public price;
-    mapping(address => uint256) public bids;
 
     constructor(address _nft, uint256 _nftId, uint256 _price) {
         nft = IERC721(_nft);
         nftId = _nftId;
-
         seller = payable(msg.sender);
-        require(nft.ownerOf(nftId) == msg.sender, "sender not the nft owner");
         price = _price;
-
-        
         onSale = true;
-
-       emit NFTListed(seller, nftId);
+        require(nft.ownerOf(nftId) == msg.sender, "sender not the nft owner");
+        emit NFTListed(seller, nftId);
     }
 
+    // list
+    // buy
+    //
+    //
+    // list
+    // buy (nft goes to seller -> smart contract, money goes buyer -> smart contract)
+    // shipping (if cancelled, nft goes back to seller, money goes back to buyer)
+    // received
+    // complete transaction (nft goes to buyer, money goes to seller)
+    //
+
+    // list
+    // enabled listing (NFT goes buyer -> smart contract)
+    // users bid (money goes bidder -> smart contract)
+    // listing ends (assuming bidder exists,
+    //            NFT goes to highest bidder, money from highest bidder goes smart contract -> seller
+    //            all other bids go from smart contract -> each bidder (aka a refund)
+
     function buyNFT() external {
+        address buyer = msg.sender;
         require(onSale, "not on sale");
-        require(nft.ownerOf(nftId) == msg.sender, "sender not the nft owner");
-        nft.transferFrom(msg.sender, address(this), nftId);
+        require(seller != buyer, "buyer cannot be the seller");
+        require(nft.ownerOf(nftId) == seller, "seller no longer owns nft");
 
-        // if (buyer == address(0)) {
-        //     buyer = msg.sender; 
-        // }
+        nft.transferFrom(seller, buyer, nftId);
+        // contract ERC721: function transferFrom(from, to, index)
+        //   msg.sender == contract address
+        //   param 0 == seller address
+        //   param 1 == buyer address (previously msg.sender)
+        //   param 2 == the nft id within the param 0 address
 
-        // if (buyer != address(0)) {
-        //     nft.safeTransferFrom(address(this), buyer, nftId);
-        //     seller.transfer(price);
-        // } else {
-        //     nft.safeTransferFrom(address(this), seller, nftId);
-        // }
-        // onSale = false;
-
-       emit NFTBought(buyer, seller, nftId, price);
+        onSale = false;
+        emit NFTBought(buyer, seller, nftId, price);
     }
 }
 
